@@ -1,31 +1,16 @@
-services:
-  # 1. 데이터베이스 (MariaDB)
-  db:
-    image: mariadb:latest
-    container_name: yj-db
-    restart: always
-    environment:
-      MARIADB_ROOT_PASSWORD: "0927"
-      MARIADB_DATABASE: user_db
-    ports:
-      - "3316:3306"
+# React 앱 빌드
+FROM node:22-alpine AS build
+WORKDIR /app
 
-  # 2. 백엔드 (Spring Boot)
-  backend:
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-    build: ./backend
-    container_name: yj-backend
-    ports:
-      - "8080:8080"
-    depends_on:
-      - db
+COPY package.json package-lock.json ./
+RUN npm ci
 
-  # 3. 프론트엔드 (React)
-  frontend:
-    build: ./frontend
-    container_name: yj-frontend
-    ports:
-      - "63342:80" # 호스트의 63342 포트를 컨테이너의 80 포트와 연결
-    depends_on:
-      - backend
+COPY . .
+RUN npm run build
+
+# 빌드 결과를 웹 서버로 제공
+FROM nginx:stable-alpine
+COPY --from=build /app/build /usr/share/nginx/html
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
